@@ -1,4 +1,4 @@
-"""Installation script for the 'orbit.ext_template' python package."""
+"""Installation script for the 'orbit.DRL-for-Active-Semantic-SLAM' python package."""
 
 import os
 import toml
@@ -20,8 +20,8 @@ INSTALL_REQUIRES = [
 setup(
     # TODO: Change your package naming
     # -----------------------------------------------------------------
-    name="orbit.ext_template",
-    packages=["orbit.ext_template"],
+    name="orbit.DRL-for-Active-Semantic-SLAM",
+    packages=["orbit.DRL-for-Active-Semantic-SLAM"],
     # -----------------------------------------------------------------
     author=EXTENSION_TOML_DATA["package"]["author"],
     maintainer=EXTENSION_TOML_DATA["package"]["maintainer"],

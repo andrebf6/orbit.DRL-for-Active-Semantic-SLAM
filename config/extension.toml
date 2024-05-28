@@ -9,13 +9,13 @@ readme  = "README.md"
 
 # TODO: Change your package specifications
 # -----------------------------------------------------------------
-title = "Extension Template"
-author = "ORBIT Project Developers"
-maintainer = "Nico Burger"
-maintainer_email = "nburger@theaiinstitute.com"
-description="Extension Template for Orbit"
-repository = "https://github.com/isaac-orbit/orbit.ext_template.git"
-keywords = ["extension", "template", "orbit"]
+title = "DRL for Active Semantic SLAM"
+author = "Andrea Bravo i Forn"
+maintainer = "Andrea Bravo i Forn"
+maintainer_email = "andrebf6@gmail.com"
+description="Train a DRL agent for exploration tasks in indoor environments, exploiting semantic information from a 3D scene graph"
+repository = "https://github.com/andrebf6/orbit.DRL-for-Active-Semantic-SLAM"
+keywords = ["DRL", "drone", "exploration", "Semantics", "orbit"]
 # -----------------------------------------------------------------
 
 [dependencies]
@@ -27,7 +27,7 @@ keywords = ["extension", "template", "orbit"]
 [[python.module]]
 # TODO: Change your package name
 # -----------------------------------------------------------------
-name = "orbit.ext_template"
+name = "orbit.DRL-for-Active-Semantic-SLAM"
 # -----------------------------------------------------------------
 
 [orbit_settings]
