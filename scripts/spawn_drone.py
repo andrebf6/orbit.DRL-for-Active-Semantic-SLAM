@@ -29,7 +29,7 @@ def design_scene():
     cfg_light_distant.func("/World/lightDistant", cfg_light_distant, translation=(1, 0, 10))
     
     # spawn a usd file of a drone into the scene
-    cfg = sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Robots/Quadcopter/quadcopter.usd")
+    cfg = sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Robots/Crazyflie/cf2x.usd")
     cfg.func("/World/Robot", cfg, translation=(0.0, 0.0, 1.05))
 
 
