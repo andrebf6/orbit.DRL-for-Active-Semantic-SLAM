@@ -28,37 +28,37 @@ def get_crazyflie_config():
                 stabilization_threshold=0.001,
             ),
         ),
-        # init_state=ArticulationCfg.InitialStateCfg(
-        #     pos=(0.0, 0.0, 2.0), joint_pos={"slider_to_cart": 0.0, "cart_to_pole": 0.0}
-        # ),
+        init_state=ArticulationCfg.InitialStateCfg(
+            pos=(0.0, 0.0, 0.0), joint_pos={"m1_joint": 0.0, "m2_joint": 0.0, "m3_joint": 0.0, "m4_joint": 0.0}
+        ),
         actuators={
             "body_prop_1": ImplicitActuatorCfg(
                 joint_names_expr=["m1_joint"],
-                effort_limit=400.0,
+                effort_limit=2000.0,
                 velocity_limit=100.0,
-                stiffness=5.0,
-                damping=0.0,
+                stiffness=0.0,
+                damping=100.0,
             ),
             "body_prop_2": ImplicitActuatorCfg(
                 joint_names_expr=["m2_joint"],
-                effort_limit=400.0,
+                effort_limit=2000.0,
                 velocity_limit=100.0,
-                stiffness=5.0,
-                damping=0.0,
+                stiffness=0.0,
+                damping=100.0,
             ),
             "body_prop_3": ImplicitActuatorCfg(
                 joint_names_expr=["m3_joint"],
-                effort_limit=400.0,
+                effort_limit=2000.0,
                 velocity_limit=100.0,
-                stiffness=5.0,
-                damping=0.0,
+                stiffness=0.0,
+                damping=100.0,
             ),
             "body_prop_4": ImplicitActuatorCfg(
                 joint_names_expr=["m4_joint"],
-                effort_limit=400.0,
+                effort_limit=2000.0,
                 velocity_limit=100.0,
-                stiffness=5.0,
-                damping=0.0,
+                stiffness=0.0,
+                damping=100.0,
             ),
         },
     )

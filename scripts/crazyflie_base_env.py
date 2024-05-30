@@ -18,7 +18,7 @@ import torch
 
 import omni.isaac.orbit.envs.mdp as mdp
 from omni.isaac.orbit.envs import BaseEnv, BaseEnvCfg
-from omni.isaac.orbit.managers import EventTermCfg as EventTerm
+# from omni.isaac.orbit.managers import EventTermCfg as EventTerm
 from omni.isaac.orbit.managers import ObservationGroupCfg as ObsGroup
 from omni.isaac.orbit.managers import ObservationTermCfg as ObsTerm
 from omni.isaac.orbit.managers import SceneEntityCfg
@@ -60,10 +60,10 @@ class QuadrotorSceneCfg(InteractiveSceneCfg):
 class ActionsCfg:
     """Action specifications for the environment."""
 
-    joint_vels_1 = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m1_joint"], scale=5.0)
-    joint_vels_2 = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m2_joint"], scale=5.0)
-    joint_vels_3 = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m3_joint"], scale=5.0)
-    joint_vels_4 = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m4_joint"], scale=5.0)
+    m1_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m1_joint"], scale=1.0)
+    m2_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m2_joint"], scale=1.0)
+    m3_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m3_joint"], scale=1.0)
+    m4_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m4_joint"], scale=1.0)
 
 
 @configclass
@@ -75,8 +75,8 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         # observation terms (order preserved)
-        joint_pos_rel = ObsTerm(func=mdp.joint_pos)
-        joint_vel_rel = ObsTerm(func=mdp.joint_vel)
+        joint_positions = ObsTerm(func=mdp.joint_pos)
+        joint_velocities = ObsTerm(func=mdp.joint_vel)
 
         def __post_init__(self) -> None:
             self.enable_corruption = False
@@ -91,7 +91,8 @@ class DroneEnvCfg(BaseEnvCfg):
     """Configuration for the drone environment."""
 
     # Scene settings
-    scene = QuadrotorSceneCfg(num_envs=10, env_spacing=2.5)
+    scene = QuadrotorSceneCfg(num_envs=5, env_spacing=2.5)
+    
     # Basic settings
     observations = ObservationsCfg()
     actions = ActionsCfg()
@@ -101,9 +102,9 @@ class DroneEnvCfg(BaseEnvCfg):
         # viewer settings
         self.viewer.eye = [4.5, 0.0, 6.0]
         self.viewer.lookat = [0.0, 0.0, 2.0]
+        
         # step settings
         self.decimation = 4  # env step every 4 sim steps: 200Hz / 4 = 50Hz
-        # simulation settings
         self.sim.dt = 0.005  # sim step every 5ms: 200Hz
 
 
@@ -129,26 +130,26 @@ def main():
                 print("[INFO]: Resetting environment...")
 
             # sample random actions
-            # joint_efforts = torch.randn_like(env.action_manager.action)
-            vel = torch.zeros_like(env.action_manager.action)
+            velocity_target = torch.zeros_like(env.action_manager.action)
+            # NOTE: action dimension = # envs x (sum action terms dimensions)
            
-            mod = 0.1
-            vel[0, 0] = mod
-            vel[0, 1] = -mod
-            vel[0, 2] = mod
-            vel[0, 3] = -mod
+            mod = 100
+            velocity_target[0, 0] = mod
+            velocity_target[0, 1] = -mod
+            velocity_target[0, 2] = mod
+            velocity_target[0, 3] = -mod
 
-            vel[1, 0] = mod
-            vel[1, 1] = -mod
-            vel[1, 2] = mod
-            vel[1, 3] = -mod
+            velocity_target[1, 0] = mod
+            velocity_target[1, 1] = -mod
+            velocity_target[1, 2] = mod
+            velocity_target[1, 3] = -mod
            
             # step the environment
-            obs, _ = env.step(vel)
+            obs, _ = env.step(velocity_target)
 
             # print current rotors' position
             if count % 200 == 0:
-                print("Velocity commands:", vel)
+                print("Velocity commands:", velocity_target)
                 print("[Env 0]: Rotor 1 velocity: ", obs["policy"][0][5].item())
             # print("Observations: ", obs)
 
