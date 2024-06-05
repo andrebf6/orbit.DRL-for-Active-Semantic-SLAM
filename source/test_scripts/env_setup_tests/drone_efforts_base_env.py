@@ -28,7 +28,9 @@ import omni.isaac.orbit.sim as sim_utils
 from omni.isaac.orbit.assets import ArticulationCfg, AssetBaseCfg
 from omni.isaac.orbit.scene import InteractiveSceneCfg
 
-from source.drone_models.crazyflie import get_crazyflie_config # Depends on UAV
+# Depends on UAV
+from source.drone_models.crazyflie import get_crazyflie_config 
+# from source.drone_models.quadrotor import get_quadrotor_config
 
 @configclass
 class QuadrotorSceneCfg(InteractiveSceneCfg):
@@ -41,7 +43,8 @@ class QuadrotorSceneCfg(InteractiveSceneCfg):
     )
 
     # drone
-    robot: ArticulationCfg = get_crazyflie_config().replace(prim_path="{ENV_REGEX_NS}/Robot")
+    robot: ArticulationCfg =  get_crazyflie_config().replace(prim_path="{ENV_REGEX_NS}/Robot")
+    # robot: ArticulationCfg = get_quadrotor_config().replace(prim_path="{ENV_REGEX_NS}/Robot")
 
     # lights
     dome_light = AssetBaseCfg(
@@ -61,11 +64,11 @@ class ActionsCfg:
     """Action specifications for the environment."""
 
     # joint_names depend on UAV
-    # NOTE: What happends if I set various joints for 1 term???
     # m1_joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m1_joint"], scale=1.0)
     # m2_joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m2_joint"], scale=1.0)
     # m3_joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m3_joint"], scale=1.0)
     # m4_joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m4_joint"], scale=1.0)
+    
     joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m1_joint","m2_joint","m3_joint","m4_joint"], scale=1.0)
 
 
@@ -102,8 +105,8 @@ class DroneEnvCfg(BaseEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         # viewer settings
-        self.viewer.eye = [4.5, 0.0, 6.0]
-        self.viewer.lookat = [0.0, 0.0, 2.0]
+        self.viewer.eye = [2.0, 0.0, 2.5]
+        self.viewer.lookat = [-0.5, 0.0, 0.5]
         # step settings
         self.decimation = 4  # env step every 4 sim steps: 200Hz / 4 = 50Hz
         # simulation settings
@@ -136,19 +139,20 @@ def main():
             effort_target = torch.zeros_like(env.action_manager.action)
             # NOTE: action dimension = # envs x (sum action terms dimensions)
             
-            mod = 0.000002
+            
+            mod = 9.81*0.025/4
             effort_target[0, 0] = mod
             effort_target[0, 1] = -mod
             effort_target[0, 2] = mod
             effort_target[0, 3] = -mod
 
-            mod = 0.000004
+            mod = 9.81*0.05/4
             effort_target[1, 0] = mod
             effort_target[1, 1] = -mod
             effort_target[1, 2] = mod
             effort_target[1, 3] = -mod
 
-            mod = 0.000001
+            mod = 9.81*1/4
             effort_target[2, 0] = mod
             effort_target[2, 1] = -mod
             effort_target[2, 2] = mod
@@ -158,11 +162,6 @@ def main():
             # step the environment
             obs, _ = env.step(effort_target)
 
-            # print current rotors' position
-            # if count % 200 == 0:
-            #     print("Effort commands:", effort_target)
-            #     print("[Env 0]: Rotor 1 velocity: ", obs["policy"][0][5].item())
-            
             # update counter
             count += 1
 

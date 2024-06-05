@@ -146,7 +146,7 @@ def main():
             
             # Access robot state
             robot = env.scene["robot"]
-            print("Robot root state: ", robot.data.root_state_w)
+            # print("Robot root state: ", robot.data.root_state_w)
 
             # Apply high-level controller
             controller.update_state(state=robot.data.root_state_w)

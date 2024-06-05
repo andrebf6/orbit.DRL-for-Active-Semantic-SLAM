@@ -22,7 +22,7 @@ from omni.isaac.orbit.utils import configclass
 
 # Depends on UAV
 from source.drone_models.crazyflie import get_crazyflie_config 
-# from source.drone_models.quadrotor import get_quadrotor_config # Depends on UAV
+# from source.drone_models.quadrotor import get_quadrotor_config 
 
 
 @configclass
@@ -56,7 +56,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     while simulation_app.is_running():
         
         # Reset
-        if count % 1000 == 0:
+        if count % 500 == 0:
             count = 0
 
             # ROOT STATE
@@ -86,46 +86,54 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
         # Apply action
 
         # APPLY EFFORT
-        # if count % 200 == 0:
-        #     efforts = torch.zeros_like(robot.data.joint_pos)
-        #     mod = 0.1  # mod = 9.81*0.025/4
-        #     efforts[0, 0] = mod
-        #     efforts[0, 1] = -mod
-        #     efforts[0, 2] = mod
-        #     efforts[0, 3] = -mod
-        #     
-        #     mod = 1
-        #     efforts[1, 0] = mod
-        #     efforts[1, 1] = -mod
-        #     efforts[1, 2] = mod
-        #     efforts[1, 3] = -mod
+        if count % 400 == 0:
+            efforts = torch.zeros_like(robot.data.joint_pos)
+            mod = 9.81*0.025/4  # mod = 3 
+            efforts[0, 0] = mod
+            efforts[0, 1] = -mod
+            efforts[0, 2] = mod
+            efforts[0, 3] = -mod
+            # efforts[0, 1] = mod
+            # efforts[0, 3] = -mod
+            # efforts[0, 5] = mod
+            # efforts[0, 7] = -mod
+            
+            mod = 9.81*0.025/4 #5
+            efforts[1, 0] = mod
+            efforts[1, 1] = mod
+            efforts[1, 2] = mod
+            efforts[1, 3] = mod
+            # efforts[1, 1] = mod
+            # efforts[1, 3] = -mod
+            # efforts[1, 5] = mod
+            # efforts[1, 7] = -mod
         
-        #     print("Effort commands:", efforts)
-        #     print("joint_vel:", robot.data.joint_vel)
-
-        #     robot.set_joint_effort_target(efforts)
-        #     scene.write_data_to_sim()
-
-        # APPLY VELOCITY
-        vel = torch.zeros_like(robot.data.joint_vel)
-        mod = 100
-        vel[0, 0] = mod
-        vel[0, 1] = -mod
-        vel[0, 2] = mod
-        vel[0, 3] = -mod
-
-        mod = 1000
-        vel[1, 0] = mod
-        vel[1, 1] = -mod
-        vel[1, 2] = mod
-        vel[1, 3] = -mod
-
-        if count % 200 == 0:
-            print("Velocity commands:", vel)
+            print("Effort commands:", efforts)
             print("joint_vel:", robot.data.joint_vel)
 
-        robot.set_joint_velocity_target(vel)
-        scene.write_data_to_sim()
+            robot.set_joint_effort_target(efforts)
+            scene.write_data_to_sim()
+
+        # APPLY VELOCITY
+        # vel = torch.zeros_like(robot.data.joint_vel)
+        # mod = 100
+        # vel[0, 0] = mod
+        # vel[0, 1] = -mod
+        # vel[0, 2] = mod
+        # vel[0, 3] = -mod
+
+        # mod = 1000
+        # vel[1, 0] = mod
+        # vel[1, 1] = -mod
+        # vel[1, 2] = mod
+        # vel[1, 3] = -mod
+
+        # if count % 200 == 0:
+        #     print("Velocity commands:", vel)
+        #     print("joint_vel:", robot.data.joint_vel)
+
+        # robot.set_joint_velocity_target(vel)
+        # scene.write_data_to_sim()
 
         # Perform step
         sim.step()

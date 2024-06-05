@@ -62,10 +62,12 @@ git checkout --track origin/low_level_position_controller
 
 ### Headless mode
 ```js
+cd orbit.DRL-for-Active-Semantic-SLAM/
 /orbit/orbit.sh -p ./source/test_scripts/env_setup_tests/drone_efforts_base_env.py --headless
 ```
 
 ### Using the NVIDIA Streaming Client
 ```js
+cd orbit.DRL-for-Active-Semantic-SLAM/
 /orbit/orbit.sh -p ./source/test_scripts/env_setup_tests/drone_efforts_base_env.py --livestream=1
 ```

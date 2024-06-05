@@ -195,8 +195,8 @@ class NonlinearController():
             self.int = self.int +  (ep * dt)
             ei = self.int
 
-            # print("Robot position in world frame:", self.p[i,:])
-            # print("Desired position in world frame:", p_ref)
+            print("Robot position in world frame:", self.p[i,:])
+            print("Desired position in world frame:", p_ref)
 
             # print("Postion error:", ep)
             # print("Velocity error:", ev)
