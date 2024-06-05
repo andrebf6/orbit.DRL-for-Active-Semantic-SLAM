@@ -28,7 +28,7 @@ import omni.isaac.orbit.sim as sim_utils
 from omni.isaac.orbit.assets import ArticulationCfg, AssetBaseCfg
 from omni.isaac.orbit.scene import InteractiveSceneCfg
 
-from source.drone_models.crazyflie import get_crazyflie_config # Depends on UAV
+from source.drone_models.crazyflie import get_crazyflie_config 
 from source.high_level_controller.quadrotor_controller import NonlinearController
 
 @configclass

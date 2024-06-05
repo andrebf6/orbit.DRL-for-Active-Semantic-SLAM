@@ -13,7 +13,7 @@ This repository is build on topof the [Extension Template for Orbit](https://git
 - Orbit (SimLab)
 
 ### Enviornment Setup
-This project has een developed inside a Docker container on a remote server. The GUI can be visualized through the NVIDIA Streaming Client.
+This project has been developed inside a Docker container on a remote server. The GUI can be visualized through the NVIDIA Streaming Client.
 
 1. **Setup a Docker Container with ISAAC SIM**
 
