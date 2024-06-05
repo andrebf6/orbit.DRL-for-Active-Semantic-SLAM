@@ -3,7 +3,7 @@ from omni.isaac.orbit.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Launch a quadrotor base environment.")
-parser.add_argument("--num_envs", type=int, default=2, help="Number of environments to spawn.")
+parser.add_argument("--num_envs", type=int, default=3, help="Number of environments to spawn.")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -28,7 +28,7 @@ import omni.isaac.orbit.sim as sim_utils
 from omni.isaac.orbit.assets import ArticulationCfg, AssetBaseCfg
 from omni.isaac.orbit.scene import InteractiveSceneCfg
 
-from scripts.quadrotor import get_quadrotor_config
+from source.drone_models.crazyflie import get_crazyflie_config # Depends on UAV
 
 @configclass
 class QuadrotorSceneCfg(InteractiveSceneCfg):
@@ -41,7 +41,7 @@ class QuadrotorSceneCfg(InteractiveSceneCfg):
     )
 
     # drone
-    robot: ArticulationCfg = get_quadrotor_config().replace(prim_path="{ENV_REGEX_NS}/Robot")
+    robot: ArticulationCfg = get_crazyflie_config().replace(prim_path="{ENV_REGEX_NS}/Robot")
 
     # lights
     dome_light = AssetBaseCfg(
@@ -60,10 +60,13 @@ class QuadrotorSceneCfg(InteractiveSceneCfg):
 class ActionsCfg:
     """Action specifications for the environment."""
 
-    joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["rotor0"], scale=5.0)
-    joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["rotor1"], scale=5.0)
-    joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["rotor2"], scale=5.0)
-    joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["rotor3"], scale=5.0)
+    # joint_names depend on UAV
+    # NOTE: What happends if I set various joints for 1 term???
+    # m1_joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m1_joint"], scale=1.0)
+    # m2_joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m2_joint"], scale=1.0)
+    # m3_joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m3_joint"], scale=1.0)
+    # m4_joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m4_joint"], scale=1.0)
+    joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m1_joint","m2_joint","m3_joint","m4_joint"], scale=1.0)
 
 
 @configclass
@@ -123,24 +126,43 @@ def main():
     while simulation_app.is_running():
         with torch.inference_mode():
             # reset
-            if count % 300 == 0:
+            if count % 500 == 0:
                 count = 0
                 env.reset()
                 print("-" * 80)
                 print("[INFO]: Resetting environment...")
 
             # sample random actions
-            # joint_efforts = torch.randn_like(env.action_manager.action)
-            joint_efforts = env.action_manager.action
+            effort_target = torch.zeros_like(env.action_manager.action)
+            # NOTE: action dimension = # envs x (sum action terms dimensions)
             
-            if count % 50 == 0:
-                print("[INFO]: Joint efforts", joint_efforts )
+            mod = 0.000002
+            effort_target[0, 0] = mod
+            effort_target[0, 1] = -mod
+            effort_target[0, 2] = mod
+            effort_target[0, 3] = -mod
+
+            mod = 0.000004
+            effort_target[1, 0] = mod
+            effort_target[1, 1] = -mod
+            effort_target[1, 2] = mod
+            effort_target[1, 3] = -mod
+
+            mod = 0.000001
+            effort_target[2, 0] = mod
+            effort_target[2, 1] = -mod
+            effort_target[2, 2] = mod
+            effort_target[2, 3] = -mod
+
 
             # step the environment
-            obs, _ = env.step(joint_efforts)
+            obs, _ = env.step(effort_target)
 
             # print current rotors' position
-            print("[Env 0]: Rotors' position: ", obs["policy"][0][1].item())
+            # if count % 200 == 0:
+            #     print("Effort commands:", effort_target)
+            #     print("[Env 0]: Rotor 1 velocity: ", obs["policy"][0][5].item())
+            
             # update counter
             count += 1
 

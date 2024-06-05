@@ -12,12 +12,15 @@ simulation_app = app_launcher.app
 
 # Import oher libararies
 import torch
+
 import omni.isaac.core.utils.prims as prim_utils
 import omni.isaac.orbit.sim as sim_utils
 from omni.isaac.orbit.assets import Articulation
 from omni.isaac.orbit.sim import SimulationContext
 
-from scripts.quadrotor import get_quadrotor_config
+# Depends on UAV
+# from source.drone_models.crazyflie import get_crazyflie_config 
+from source.drone_models.quadrotor import get_quadrotor_config 
 
 
 def design_scene():
@@ -31,23 +34,23 @@ def design_scene():
     cfg = sim_utils.DomeLightCfg(intensity=3000.0, color=(0.75, 0.75, 0.75))
     cfg.func("/World/Light", cfg)
 
-    # Robot
+    # Drone
     origins = [[0.0, 0.0, 0.0], [-1.0, 0.0, 0.0]]
     for i, origin in enumerate(origins):
         prim_utils.create_prim(f"/World/Origin{i}", "Xform", translation=origin)
 
-    quadrotor_cfg = get_quadrotor_config().copy()
-    quadrotor_cfg.prim_path = "/World/Origin.*/Robot"
-    quadrotor = Articulation(cfg=quadrotor_cfg)
+    drone_cfg = get_quadrotor_config().copy()
+    drone_cfg.prim_path = "/World/Origin.*/Robot"
+    drone = Articulation(cfg=drone_cfg)
 
-    scene_entities = {"quadrotor": quadrotor}
+    scene_entities = {"drone": drone }
     return scene_entities, origins
 
 
 def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articulation], origins: torch.Tensor):
     """Runs the simulation loop."""
     # Extract scene entities
-    robot = entities["quadrotor"]
+    robot = entities["drone"]
     
     # Define simulation stepping
     sim_dt = sim.get_physics_dt()
@@ -95,7 +98,7 @@ def run_simulator(sim: sim_utils.SimulationContext, entities: dict[str, Articula
         efforts[1, 7] = 5.0
         
         if count % 200 == 0:
-            print("Effot:", efforts)
+            print("Effort commands:", efforts)
             print("joint_vel:", robot.data.joint_vel)
 
         robot.set_joint_effort_target(efforts)

@@ -28,7 +28,7 @@ import omni.isaac.orbit.sim as sim_utils
 from omni.isaac.orbit.assets import ArticulationCfg, AssetBaseCfg
 from omni.isaac.orbit.scene import InteractiveSceneCfg
 
-from scripts.crazyflie import get_crazyflie_config
+from source.drone_models.crazyflie import get_crazyflie_config # Depends on UAV
 
 @configclass
 class QuadrotorSceneCfg(InteractiveSceneCfg):
@@ -59,11 +59,12 @@ class QuadrotorSceneCfg(InteractiveSceneCfg):
 @configclass
 class ActionsCfg:
     """Action specifications for the environment."""
-
-    m1_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m1_joint"], scale=1.0)
-    m2_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m2_joint"], scale=1.0)
-    m3_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m3_joint"], scale=1.0)
-    m4_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m4_joint"], scale=1.0)
+    
+    # joint_names depend on UAV
+    m1_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m1_joint"], scale=1)
+    m2_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m2_joint"], scale=1)
+    m3_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m3_joint"], scale=1)
+    m4_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m4_joint"], scale=1)
 
 
 @configclass
@@ -123,7 +124,7 @@ def main():
     while simulation_app.is_running():
         with torch.inference_mode():
             # reset
-            if count % 1000 == 0:
+            if count % 500 == 0:
                 count = 0
                 env.reset()
                 print("-" * 80)
@@ -133,12 +134,13 @@ def main():
             velocity_target = torch.zeros_like(env.action_manager.action)
             # NOTE: action dimension = # envs x (sum action terms dimensions)
            
-            mod = 100
+            mod = 1000
             velocity_target[0, 0] = mod
             velocity_target[0, 1] = -mod
             velocity_target[0, 2] = mod
             velocity_target[0, 3] = -mod
 
+            mod = 3000
             velocity_target[1, 0] = mod
             velocity_target[1, 1] = -mod
             velocity_target[1, 2] = mod
@@ -151,8 +153,7 @@ def main():
             if count % 200 == 0:
                 print("Velocity commands:", velocity_target)
                 print("[Env 0]: Rotor 1 velocity: ", obs["policy"][0][5].item())
-            # print("Observations: ", obs)
-
+           
             # update counter
             count += 1
 
