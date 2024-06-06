@@ -121,20 +121,16 @@ def main():
     while simulation_app.is_running():
         with torch.inference_mode():
             # reset
-            if count % 500 == 0:
+            if count % 200 == 0:
                 count = 0
                 env.reset()
                 print("-" * 80)
                 print("[INFO]: Resetting environment...")
 
-            # sample random actions
             wrench_target = torch.zeros_like(env.action_manager.action)
 
-            wrench_target[:, 2] = 80.50107645620974 # Force on the drone Z axis
-            wrench_target[:, 3:6] =[0.38746889, 0.80601383, 0.07193346] # Torque
-            
-            print('Wrench commands: ',wrench_target) 
-
+            wrench_target[:, 2] = 9.8*0.04 # Force on the drone Z axis
+            wrench_target[:, 3:6] = torch.tensor([0, 0, 0]) # Torque
 
             # step the environment
             obs, _ = env.step(wrench_target)
