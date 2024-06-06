@@ -2,8 +2,8 @@ import argparse
 from omni.isaac.orbit.app import AppLauncher
 
 # add argparse arguments
-parser = argparse.ArgumentParser(description="Launch a quadrotor base environment.")
-parser.add_argument("--num_envs", type=int, default=2, help="Number of environments to spawn.")
+parser = argparse.ArgumentParser(description="Launch a quadrotor base environment with a controller.")
+parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to spawn.")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -21,15 +21,17 @@ from omni.isaac.orbit.envs import BaseEnv, BaseEnvCfg
 # from omni.isaac.orbit.managers import EventTermCfg as EventTerm
 from omni.isaac.orbit.managers import ObservationGroupCfg as ObsGroup
 from omni.isaac.orbit.managers import ObservationTermCfg as ObsTerm
-from omni.isaac.orbit.managers import SceneEntityCfg
+from source.custom_actions.body_actions_cfg import BodyWrenchActionCfg
+# from omni.isaac.orbit.managers import SceneEntityCfg
 from omni.isaac.orbit.utils import configclass
 
 import omni.isaac.orbit.sim as sim_utils
 from omni.isaac.orbit.assets import ArticulationCfg, AssetBaseCfg
 from omni.isaac.orbit.scene import InteractiveSceneCfg
 
+# Depends on UAV
 from source.drone_models.crazyflie import get_crazyflie_config 
-from source.high_level_controller.quadrotor_controller import NonlinearController
+from source.high_level_controller.quadrotor_controller_total_torque_force import NonlinearController
 
 @configclass
 class QuadrotorSceneCfg(InteractiveSceneCfg):
@@ -42,8 +44,8 @@ class QuadrotorSceneCfg(InteractiveSceneCfg):
     )
 
     # drone
-    robot: ArticulationCfg = get_crazyflie_config().replace(prim_path="{ENV_REGEX_NS}/Robot")
-    
+    robot: ArticulationCfg =  get_crazyflie_config().replace(prim_path="{ENV_REGEX_NS}/Robot")
+   
     # lights
     dome_light = AssetBaseCfg(
         prim_path="/World/DomeLight",
@@ -60,12 +62,8 @@ class QuadrotorSceneCfg(InteractiveSceneCfg):
 @configclass
 class ActionsCfg:
     """Action specifications for the environment."""
+    body_wrench = BodyWrenchActionCfg(asset_name="robot")
     
-    # joint_names depend on UAV
-    m1_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m1_joint"], scale=1)
-    m2_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m2_joint"], scale=-1)
-    m3_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m3_joint"], scale=1)
-    m4_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m4_joint"], scale=-1)
 
 
 @configclass
@@ -77,8 +75,8 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         # observation terms (order preserved)
-        joint_positions = ObsTerm(func=mdp.joint_pos)
-        joint_velocities = ObsTerm(func=mdp.joint_vel)
+        joint_pos_rel = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel_rel = ObsTerm(func=mdp.joint_vel_rel)
 
         def __post_init__(self) -> None:
             self.enable_corruption = False
@@ -93,8 +91,7 @@ class DroneEnvCfg(BaseEnvCfg):
     """Configuration for the drone environment."""
 
     # Scene settings
-    scene = QuadrotorSceneCfg(num_envs=5, env_spacing=2.5)
-    
+    scene = QuadrotorSceneCfg(num_envs=10, env_spacing=2.5)
     # Basic settings
     observations = ObservationsCfg()
     actions = ActionsCfg()
@@ -102,11 +99,11 @@ class DroneEnvCfg(BaseEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         # viewer settings
-        self.viewer.eye = [4.5, 0.0, 6.0]
-        self.viewer.lookat = [0.0, 0.0, 2.0]
-        
+        self.viewer.eye = [2.0, 0.0, 2.5]
+        self.viewer.lookat = [-0.5, 0.0, 0.5]
         # step settings
         self.decimation = 4  # env step every 4 sim steps: 200Hz / 4 = 50Hz
+        # simulation settings
         self.sim.dt = 0.005  # sim step every 5ms: 200Hz
 
 
@@ -129,33 +126,29 @@ def main():
             Kr=[2.0, 2.0, 2.0]
         )
     print('Controller set up!')
-    
+
     # simulate physics
     count = 0
     while simulation_app.is_running():
         with torch.inference_mode():
             # reset
-            if count % 1000 == 0:
+            if count % 500 == 0:
                 count = 0
                 env.reset()
                 print("-" * 80)
                 print("[INFO]: Resetting environment...")
 
-            # High-level controller
-            # NOTE: Now the setpoint is given from a csv file. Later on the setpoint will be send by the RL algorithm.
-            
             # Access robot state
             robot = env.scene["robot"]
-            # print("Robot root state: ", robot.data.root_state_w)
+            print("Robot root state: ", robot.data.root_state_w)
 
             # Apply high-level controller
             controller.update_state(state=robot.data.root_state_w)
-            rotor_vel = controller.update(dt=env_cfg.sim.dt)
-            print("Actions: ", rotor_vel)
-            # NOTE: Output action dimension = # envs x (sum action terms dimensions)
-                      
+            wrench = controller.update(dt=env_cfg.sim.dt) # DIMENSION = # envs x 6
+            print("Wrench to apply: ", wrench)
+
             # step the environment
-            obs, _ = env.step(rotor_vel.to(torch.device('cuda:0')))
+            obs, _ = env.step(wrench.to(torch.device('cuda:0')))
 
             # update counter
             count += 1

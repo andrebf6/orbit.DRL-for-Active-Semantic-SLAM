@@ -60,6 +60,8 @@ class NonlinearController():
         # Define the dynamic parameters for the vehicle
         self.m = 0.0282             # Mass in Kg
         self.g = 9.81               # The gravity acceleration ms^-2
+        self.max_force = 100
+        self.max_torque = 100
               
         # Read the target trajectory from a CSV file inside the trajectories directory
         # Remove afterwards
@@ -117,8 +119,8 @@ class NonlinearController():
         orientation_quat[:, [0, 3]] = orientation_quat[:, [3, 0]]
         self.R = Rotation.from_quat(orientation_quat)
             
-        # for i in range(self.num_envs):
-        #     print("Robot rotation: ", self.R[i].as_matrix())
+        for i in range(self.num_envs):
+            print("Robot rotation: ", self.R[i].as_matrix())
         
         self.received_first_state = True
 
@@ -177,9 +179,12 @@ class NonlinearController():
             print("Robot position in world frame:", self.p[i,:])
             print("Desired position in world frame:", p_ref)
 
+            print("Robot velocity in world frame:", self.v[i,:])
+            print("Desired velocity in world frame:", v_ref)
+
             # print("Postion error:", ep)
             # print("Velocity error:", ev)
-            # print("Integral error:", ei)
+            print("Integral error:", ei)
 
             # Compute F_des term
             F_des = -(self.Kp @ ep) - (self.Kd @ ev) - (self.Ki @ ei) + np.array([0.0, 0.0, self.m * self.g]) + (self.m * a_ref)
@@ -214,6 +219,9 @@ class NonlinearController():
             # Compute an approximation of the current vehicle acceleration in the inertial frame (since we cannot measure it directly)
             self.a = (u_1 * Z_B) / self.m - np.array([0.0, 0.0, self.g])
 
+            print("Robot acceleration in world frame:", self.a)
+            print("Desired acceleration in world frame:", a_ref)
+
             # Compute the desired angular velocity by projecting the angular velocity in the Xb-Yb plane
             # projection of angular velocity on xB − yB plane
             # see eqn (7) from [2].
@@ -231,8 +239,8 @@ class NonlinearController():
             tau = -(self.Kr @ e_R) - (self.Kw @ e_w)
 
             # Convert the desired force and torque to angular velocity [rad/s] references to give to each rotor.
-            # NOTE: Clip torque and force to apply to the drone
-            self.applied_wrench[i,2:6] = torch.tensor([u_1 , tau])
+            self.applied_wrench[i,2] = self.clip(u_1, self.max_force)
+            self.applied_wrench[i,3:6] = self.clip(tau, self.max_torque)
 
         # ----------------------------
         # Statistics to save for later
@@ -255,3 +263,13 @@ class NonlinearController():
             S (np.array): A matrix in so(3)
         """
         return np.array([-S[1,2], S[0,2], -S[0,1]])
+    
+    @staticmethod
+    def clip(quantity: np.ndarray, max_value: float):
+    
+        max_val = np.max(np.abs(quantity))
+        if max_val >= max_value:
+            normalize = np.maximum(max_val / max_value, 1.0)
+            quantity = quantity / normalize
+
+        return torch.tensor(quantity)
