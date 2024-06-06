@@ -37,8 +37,8 @@ class NonlinearController():
         # Number of spawned environments
         self.num_envs = num_envs 
 
-        # The current rotor references [rad/s]
-        self.input_ref = torch.zeros((self.num_envs, 4))
+        # Wrench to apply to the underactuated quadrotor [0, 0, f_z, t_x, t_y, t_z]
+        self.applied_wrench = torch.zeros((self.num_envs, 6))
 
         # The drone state in each environment expressed in the inertial frame (in ENU)
         self.p = np.zeros((self.num_envs, 3))                   # The vehicle position
@@ -60,25 +60,6 @@ class NonlinearController():
         # Define the dynamic parameters for the vehicle
         self.m = 0.0282             # Mass in Kg
         self.g = 9.81               # The gravity acceleration ms^-2
-
-        # Define the alocation matrix
-        self.cf = 5.84e-6           # Thurst coefficient
-        self.ct = 1e-6              # Drag coefficient
-        self.L = 0.043841           # Arm length
-        
-        aloc_matrix = np.zeros((4, 4))
-        aloc_matrix[0, :] = np.array(self.cf)
-        row_2 = np.array([0, self.cf*self.L, 0, -self.cf*self.L])                                           
-        aloc_matrix[1, :] = row_2 
-        row_3 = np.array([-self.cf*self.L, 0, self.cf*self.L, 0])
-        aloc_matrix[2, :] = row_3
-        row_4 = np.array([self.ct, -self.ct, self.ct, -self.ct])
-        aloc_matrix[3, :] =  row_4
-
-        self.aloc_inv = np.linalg.pinv(aloc_matrix)
-        # print("allocation matrix inverted : ", self.aloc_inv)
-
-        self.max_rotor_vel = 2000
               
         # Read the target trajectory from a CSV file inside the trajectories directory
         # Remove afterwards
@@ -143,12 +124,10 @@ class NonlinearController():
 
     def input_reference(self):
         """
-        Method that is used to return the latest target angular velocities to be applied to the vehicle
+        Method that is used to return the latest target wrench to be applied to the vehicle
 
-        Returns:
-            A list with the target angular velocities for each individual rotor of the vehicle
         """
-        return self.input_ref
+        return self.applied_wrench
 
     def update(self, dt: float):
         """Method that implements the nonlinear control law and updates the target angular velocities for each rotor. 
@@ -211,7 +190,6 @@ class NonlinearController():
             
             # Get the desired total thrust in Z_B direction (u_1)
             u_1 = F_des @ Z_B
-            print("Force on zb axis", u_1 )
 
             # Compute the desired body-frame axis Z_b
             Z_b_des = F_des / np.linalg.norm(F_des)
@@ -251,11 +229,10 @@ class NonlinearController():
 
             # Compute the torques to apply on the rigid body
             tau = -(self.Kr @ e_R) - (self.Kw @ e_w)
-            print("Torque", tau )
 
             # Convert the desired force and torque to angular velocity [rad/s] references to give to each rotor.
-            self.input_ref[i,:] = self.force_and_torques_to_velocities(u_1, tau, self.aloc_inv, self.max_rotor_vel)
-                   
+            # NOTE: Clip torque and force to apply to the drone
+            self.applied_wrench[i,2:6] = torch.tensor([u_1 , tau])
 
         # ----------------------------
         # Statistics to save for later
@@ -268,7 +245,7 @@ class NonlinearController():
         self.atittude_error_over_time.append(e_R)
         self.attitude_rate_error_over_time.append(e_w)
 
-        return self.input_ref
+        return  self.applied_wrench
 
     @staticmethod
     def vee(S):
@@ -278,44 +255,3 @@ class NonlinearController():
             S (np.array): A matrix in so(3)
         """
         return np.array([-S[1,2], S[0,2], -S[0,1]])
-    
-    @staticmethod
-    def force_and_torques_to_velocities(force: float, torque: np.ndarray, aloc_inv: np.ndarray, max_vel: float):
-        """
-        Auxiliar method used to get the target angular velocities for each rotor, given the total desired thrust [N] and
-        torque [Nm] to be applied in the multirotor's body frame.
-
-        Note: This method assumes a quadratic thrust curve. This method will be improved in a future update,
-        and a general thrust allocation scheme will be adopted. For now, it is made to work with multirotors directly.
-
-        Args:
-            force (np.ndarray): A vector of the force to be applied in the body frame of the vehicle [N]
-            torque (np.ndarray): A vector of the torque to be applied in the body frame of the vehicle [Nm]
-
-        Returns:
-            list: A list of angular velocities [rad/s] to apply in reach rotor to accomplish suchs forces and torques
-        """
-
-        # Compute the target angular velocities (squared)
-        squared_ang_vel = aloc_inv @ np.array([force, torque[0], torque[1], torque[2]])
-
-        print("rotor velocities : ", np.sqrt(squared_ang_vel))
-
-        # Making sure that there is no negative value on the target squared angular velocities
-        squared_ang_vel[squared_ang_vel < 0] = 0.0
-
-        # ------------------------------------------------------------------------------------------------
-        # Saturate the inputs while preserving their relation to each other, by performing a normalization
-        # ------------------------------------------------------------------------------------------------
-        max_thrust_vel_squared = np.power(max_vel, 2)
-        max_val = np.max(squared_ang_vel)
-
-        if max_val >= max_thrust_vel_squared:
-            normalize = np.maximum(max_val / max_thrust_vel_squared, 1.0)
-
-            squared_ang_vel = squared_ang_vel / normalize
-
-        # Compute the angular velocities for each rotor in [rad/s]
-        ang_vel = np.sqrt(squared_ang_vel)
-
-        return torch.tensor(ang_vel)

@@ -3,7 +3,7 @@ from omni.isaac.orbit.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Launch a quadrotor base environment.")
-parser.add_argument("--num_envs", type=int, default=3, help="Number of environments to spawn.")
+parser.add_argument("--num_envs", type=int, default=2, help="Number of environments to spawn.")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -21,6 +21,7 @@ from omni.isaac.orbit.envs import BaseEnv, BaseEnvCfg
 from omni.isaac.orbit.managers import EventTermCfg as EventTerm
 from omni.isaac.orbit.managers import ObservationGroupCfg as ObsGroup
 from omni.isaac.orbit.managers import ObservationTermCfg as ObsTerm
+from source.custom_actions.body_actions_cfg import BodyWrenchActionCfg
 from omni.isaac.orbit.managers import SceneEntityCfg
 from omni.isaac.orbit.utils import configclass
 
@@ -30,7 +31,6 @@ from omni.isaac.orbit.scene import InteractiveSceneCfg
 
 # Depends on UAV
 from source.drone_models.crazyflie import get_crazyflie_config 
-# from source.drone_models.quadrotor import get_quadrotor_config
 
 @configclass
 class QuadrotorSceneCfg(InteractiveSceneCfg):
@@ -44,8 +44,7 @@ class QuadrotorSceneCfg(InteractiveSceneCfg):
 
     # drone
     robot: ArticulationCfg =  get_crazyflie_config().replace(prim_path="{ENV_REGEX_NS}/Robot")
-    # robot: ArticulationCfg = get_quadrotor_config().replace(prim_path="{ENV_REGEX_NS}/Robot")
-
+   
     # lights
     dome_light = AssetBaseCfg(
         prim_path="/World/DomeLight",
@@ -62,9 +61,8 @@ class QuadrotorSceneCfg(InteractiveSceneCfg):
 @configclass
 class ActionsCfg:
     """Action specifications for the environment."""
-
-    # joint_names depend on UAV
-    joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m1_joint","m2_joint","m3_joint","m4_joint"], scale={"m1_joint":-1.0,"m2_joint":1.0,"m3_joint":-1.0, "m4_joint":1.0})
+    body_wrench = BodyWrenchActionCfg(asset_name="robot")
+    
 
 
 @configclass
@@ -117,7 +115,7 @@ def main():
 
     # setup base environment
     env = BaseEnv(cfg=env_cfg)
-    
+
     # simulate physics
     count = 0
     while simulation_app.is_running():
@@ -130,25 +128,16 @@ def main():
                 print("[INFO]: Resetting environment...")
 
             # sample random actions
-            effort_target = torch.zeros_like(env.action_manager.action)
-            # NOTE: action dimension = # envs x sum action terms dimensions -> (action_term_dim: # joints affected by the action term)
-            # EX: (3, 4 ) - 1 action term that affects 4 joints)
-            
-            mod = 9.81*0.025/4
-            effort_target[0, :] = mod 
-            
-            mod = 9.81*0.05/4
-            effort_target[1, :] = mod 
+            wrench_target = torch.zeros_like(env.action_manager.action)
 
-            mod = 9.81*0.1/4
-            effort_target[2, :] = mod  
-
-            if count % 500 == 0:
-                print('Effort commands: ',effort_target) 
+            wrench_target[:, 2] = 80.50107645620974 # Force on the drone Z axis
+            wrench_target[:, 3:6] =[0.38746889, 0.80601383, 0.07193346] # Torque
+            
+            print('Wrench commands: ',wrench_target) 
 
 
             # step the environment
-            obs, _ = env.step(effort_target)
+            obs, _ = env.step(wrench_target)
 
             # update counter
             count += 1
