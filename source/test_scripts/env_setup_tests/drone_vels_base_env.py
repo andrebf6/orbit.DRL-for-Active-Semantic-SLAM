@@ -3,7 +3,7 @@ from omni.isaac.orbit.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Launch a quadrotor base environment.")
-parser.add_argument("--num_envs", type=int, default=2, help="Number of environments to spawn.")
+parser.add_argument("--num_envs", type=int, default=5, help="Number of environments to spawn.")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -61,11 +61,8 @@ class ActionsCfg:
     """Action specifications for the environment."""
     
     # joint_names depend on UAV
-    m1_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m1_joint"], scale=1)
-    m2_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m2_joint"], scale=1)
-    m3_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m3_joint"], scale=1)
-    m4_joint_vel = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m4_joint"], scale=1)
-
+    joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m1_joint","m2_joint","m3_joint","m4_joint"], scale={"m1_joint":-1.0,"m2_joint":1.0,"m3_joint":-1.0, "m4_joint":1.0})
+    joint_vels = mdp.JointVelocityActionCfg(asset_name="robot", joint_names=["m1_joint","m2_joint","m3_joint","m4_joint"], scale={"m1_joint":1.0,"m2_joint":-1.0,"m3_joint":1.0, "m4_joint":-1.0})
 
 @configclass
 class ObservationsCfg:
@@ -130,30 +127,33 @@ def main():
                 print("-" * 80)
                 print("[INFO]: Resetting environment...")
 
-            # sample random actions
-            velocity_target = torch.zeros_like(env.action_manager.action)
+            target_comds = torch.zeros_like(env.action_manager.action)
             # NOTE: action dimension = # envs x (sum action terms dimensions)
-           
-            mod = 1000
-            velocity_target[0, 0] = mod
-            velocity_target[0, 1] = -mod
-            velocity_target[0, 2] = mod
-            velocity_target[0, 3] = -mod
 
-            mod = 3000
-            velocity_target[1, 0] = mod
-            velocity_target[1, 1] = -mod
-            velocity_target[1, 2] = mod
-            velocity_target[1, 3] = -mod
+            effort_mod = 9.81*0.05/4
+            target_comds[:, 0:4] = effort_mod
+           
+            mod = 1
+            target_comds[0, 4:8] = mod
+
+            mod = 10
+            target_comds[1, 4:8] = mod
+
+            mod = 100
+            target_comds[2, 4:8] = mod
+
+            mod = 1000
+            target_comds[3, 4:8] = mod
+
+            mod = 10000
+            target_comds[4, 4:8] = mod
            
             # step the environment
-            obs, _ = env.step(velocity_target)
+            obs, _ = env.step(target_comds)
 
-            # print current rotors' position
-            if count % 200 == 0:
-                print("Velocity commands:", velocity_target)
-                print("[Env 0]: Rotor 1 velocity: ", obs["policy"][0][5].item())
-           
+            print("Commands:", target_comds)
+                
+                           
             # update counter
             count += 1
 

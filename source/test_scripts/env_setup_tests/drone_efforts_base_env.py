@@ -64,12 +64,7 @@ class ActionsCfg:
     """Action specifications for the environment."""
 
     # joint_names depend on UAV
-    # m1_joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m1_joint"], scale=1.0)
-    # m2_joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m2_joint"], scale=1.0)
-    # m3_joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m3_joint"], scale=1.0)
-    # m4_joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m4_joint"], scale=1.0)
-    
-    joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m1_joint","m2_joint","m3_joint","m4_joint"], scale=1.0)
+    joint_efforts = mdp.JointEffortActionCfg(asset_name="robot", joint_names=["m1_joint","m2_joint","m3_joint","m4_joint"], scale={"m1_joint":-1.0,"m2_joint":1.0,"m3_joint":-1.0, "m4_joint":1.0})
 
 
 @configclass
@@ -137,26 +132,20 @@ def main():
 
             # sample random actions
             effort_target = torch.zeros_like(env.action_manager.action)
-            # NOTE: action dimension = # envs x (sum action terms dimensions)
-            
+            # NOTE: action dimension = # envs x sum action terms dimensions -> (action_term_dim: # joints affected by the action term)
+            # EX: (3, 4 ) - 1 action term that affects 4 joints)
             
             mod = 9.81*0.025/4
-            effort_target[0, 0] = mod
-            effort_target[0, 1] = -mod
-            effort_target[0, 2] = mod
-            effort_target[0, 3] = -mod
-
+            effort_target[0, :] = mod 
+            
             mod = 9.81*0.05/4
-            effort_target[1, 0] = mod
-            effort_target[1, 1] = -mod
-            effort_target[1, 2] = mod
-            effort_target[1, 3] = -mod
+            effort_target[1, :] = mod 
 
-            mod = 9.81*1/4
-            effort_target[2, 0] = mod
-            effort_target[2, 1] = -mod
-            effort_target[2, 2] = mod
-            effort_target[2, 3] = -mod
+            mod = 9.81*0.1/4
+            effort_target[2, :] = mod  
+
+            if count % 500 == 0:
+                print('Effort commands: ',effort_target) 
 
 
             # step the environment
