@@ -60,8 +60,8 @@ class NonlinearController():
         # Define the dynamic parameters for the vehicle
         self.m = 0.0282             # Mass in Kg
         self.g = 9.81               # The gravity acceleration ms^-2
-        self.max_force = 100
-        self.max_torque = 100
+        self.max_force = 0.7
+        self.max_torque = 0.7
               
         # Read the target trajectory from a CSV file inside the trajectories directory
         # Remove afterwards
@@ -119,8 +119,8 @@ class NonlinearController():
         orientation_quat[:, [0, 3]] = orientation_quat[:, [3, 0]]
         self.R = Rotation.from_quat(orientation_quat)
             
-        for i in range(self.num_envs):
-            print("Robot rotation: ", self.R[i].as_matrix())
+        # for i in range(self.num_envs):
+        #     print("Robot rotation: ", self.R[i].as_matrix())
         
         self.received_first_state = True
 
@@ -154,13 +154,20 @@ class NonlinearController():
 
         # Update using an external trajectory
         # Remove afterwards
-        # the target positions [m], velocity [m/s], accelerations [m/s^2], jerk [m/s^3], yaw-angle [rad], yaw-rate [rad/s]
-        p_ref = np.array([self.trajectory[self.index, 1], self.trajectory[self.index, 2], self.trajectory[self.index, 3]])
-        v_ref = np.array([self.trajectory[self.index, 4], self.trajectory[self.index, 5], self.trajectory[self.index, 6]])
-        a_ref = np.array([self.trajectory[self.index, 7], self.trajectory[self.index, 8], self.trajectory[self.index, 9]])
-        j_ref = np.array([self.trajectory[self.index, 10], self.trajectory[self.index, 11], self.trajectory[self.index, 12]])
-        yaw_ref = self.trajectory[self.index, 13]
-        yaw_rate_ref = self.trajectory[self.index, 14]
+        # # the target positions [m], velocity [m/s], accelerations [m/s^2], jerk [m/s^3], yaw-angle [rad], yaw-rate [rad/s]
+        # p_ref = np.array([self.trajectory[self.index, 1], self.trajectory[self.index, 2], self.trajectory[self.index, 3]])
+        # v_ref = np.array([self.trajectory[self.index, 4], self.trajectory[self.index, 5], self.trajectory[self.index, 6]])
+        # a_ref = np.array([self.trajectory[self.index, 7], self.trajectory[self.index, 8], self.trajectory[self.index, 9]])
+        # j_ref = np.array([self.trajectory[self.index, 10], self.trajectory[self.index, 11], self.trajectory[self.index, 12]])
+        # yaw_ref = self.trajectory[self.index, 13]
+        # yaw_rate_ref = self.trajectory[self.index, 14]
+
+        p_ref = np.array([0,0,1])
+        v_ref = np.array([0,0,0])
+        a_ref = np.array([0,0,0])
+        j_ref = np.array([0,0,0])
+        yaw_ref = 0
+        yaw_rate_ref = 0
 
         # print("References updated as: position ", p_ref, "Linear velocity",v_ref , "Jerk", j_ref , "Acceleration", a_ref ,"Yaw", yaw_ref, "Yaw_ref", yaw_rate_ref)
             
@@ -176,25 +183,28 @@ class NonlinearController():
             self.int = self.int +  (ep * dt)
             ei = self.int
 
-            print("Robot position in world frame:", self.p[i,:])
-            print("Desired position in world frame:", p_ref)
+            # print("Robot position in world frame:", self.p[i,:])
+            # print("Desired position in world frame:", p_ref)
 
-            print("Robot velocity in world frame:", self.v[i,:])
-            print("Desired velocity in world frame:", v_ref)
+            # print("Robot velocity in world frame:", self.v[i,:])
+            # print("Desired velocity in world frame:", v_ref)
 
-            # print("Postion error:", ep)
-            # print("Velocity error:", ev)
-            print("Integral error:", ei)
+            print("Position error:", ep)
+            print("Velocity error:", ev)
+            print("Weight term:", np.array([0.0, 0.0, self.m * self.g]))
+            print("Acceleration term:", self.m * a_ref)
 
             # Compute F_des term
             F_des = -(self.Kp @ ep) - (self.Kd @ ev) - (self.Ki @ ei) + np.array([0.0, 0.0, self.m * self.g]) + (self.m * a_ref)
 
+            print('Desired force: ', F_des)
 
             # Get the current axis Z_B (given by the last column of the rotation matrix)
             Z_B = self.R[i].as_matrix()[:,2]
             
             # Get the desired total thrust in Z_B direction (u_1)
             u_1 = F_des @ Z_B
+            print('Applied force in the z-axis of the drone: ', u_1)
 
             # Compute the desired body-frame axis Z_b
             Z_b_des = F_des / np.linalg.norm(F_des)
@@ -220,7 +230,6 @@ class NonlinearController():
             self.a = (u_1 * Z_B) / self.m - np.array([0.0, 0.0, self.g])
 
             print("Robot acceleration in world frame:", self.a)
-            print("Desired acceleration in world frame:", a_ref)
 
             # Compute the desired angular velocity by projecting the angular velocity in the Xb-Yb plane
             # projection of angular velocity on xB − yB plane
@@ -231,9 +240,15 @@ class NonlinearController():
             w_des = np.array([-np.dot(hw, Y_b_des), 
                             np.dot(hw, X_b_des), 
                             yaw_rate_ref * Z_b_des[2]])
+            
+            print("Desired angular velocity:", self.a)
 
             # Compute the angular velocity error
             e_w = self.w[i,:] - w_des
+
+            print("Angular velocity error:", e_w)
+            print("Rotation  error:", e_R)
+
 
             # Compute the torques to apply on the rigid body
             tau = -(self.Kr @ e_R) - (self.Kw @ e_w)

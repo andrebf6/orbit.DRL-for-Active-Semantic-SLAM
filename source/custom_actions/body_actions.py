@@ -22,6 +22,7 @@ class BodyWrenchAction(ActionTerm):
         # initialize the action term
         super().__init__(cfg, env)
 
+        print('Asset: ', self._asset)
         self._raw_actions = torch.zeros(self.num_envs, self.action_dim, device=self.device)
         self._processed_actions = torch.zeros(self.num_envs, self._asset.num_bodies, self.action_dim, device=self.device)
         
@@ -46,9 +47,10 @@ class BodyWrenchAction(ActionTerm):
     """
     def process_actions(self, actions: torch.Tensor):
         
-        self._raw_actions[:] = actions                                             # DIMENSION: (#env, 6)
-        self._processed_actions = self._raw_actions.unsqueeze(1).repeat(1, 1, 1)   # DIMENSION: (#env, #body_parts_where_force_torque_is_applied, 6)
-
+        self._raw_actions[:] = actions                                                    # DIMENSION: (#env, 6)
+        body_num = 1
+        self._processed_actions = self._raw_actions.unsqueeze(1).repeat(1, body_num, 1)   # DIMENSION: (#env, #body_parts_where_force_torque_is_applied, 6)
+        
         # NOTE: TO DO
         # Parse in the BodyWrenchActionCfg the drone body parts where the torque/ force will be applied (one, the drone main body) - Options are the prims spawned with the usd. 
         # Go from name to: body_ids, total number of body parts where we apply the force (Q)
@@ -59,4 +61,4 @@ class BodyWrenchAction(ActionTerm):
 
     def apply_actions(self):
         # set external wrench
-        self._asset.set_external_force_and_torque(forces=self.processed_actions[:,:,0:3], torques= self.processed_actions[:,:, 3:6], body_ids=1)
+        self._asset.set_external_force_and_torque(forces=self.processed_actions[:,:,0:3], torques= self.processed_actions[:,:, 3:6], body_ids=0)
