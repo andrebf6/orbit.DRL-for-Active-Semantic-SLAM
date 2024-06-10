@@ -12,6 +12,25 @@ import torch
 from omni.isaac.dynamic_control import _dynamic_control
 dc = _dynamic_control.acquire_dynamic_control_interface()
 
+class ActionBroadcaster:
+    def __init__(self):
+        
+        N=100
+
+        self.actions = np.zeros((4*N, 2))
+        self.actions[0:N,0] = 1
+        self.actions[N:2*N,1] = -1
+        self.actions[2*N:3*N,0] = -1
+        self.actions[3*N:4*N,1] = 1
+
+        self.idx = -1
+    
+    def get_action(self):
+        self.idx+=1
+        if self.idx == self.actions.shape[0]:
+            self.idx=0
+        return self.actions[self.idx, :]
+
 class NonlinearController():
     """A nonlinear controller class. It implements a nonlinear controller that allows a drone to track
     aggressive trajectories. 
@@ -59,7 +78,7 @@ class NonlinearController():
         rot_dir = np.array([-1, -1, 1, 1])
         relative_poses = np.array([[0.13759538531303406, -0.20673562586307526, 0.023], [-0.125,  0.21869462728500366, 0.0230001], [0.13830871880054474, 0.20321962237358093, 0.023], [-0.12450209259986877, -0.22199904918670654, 0.023]])
         
-        rb =dc.get_rigid_body("env0/Robot" + "/body")
+        rb =dc.get_rigid_body("World/envs/env0/Robot" + "/body")
         rotors = [dc.get_rigid_body("env0/Robot" + "/rotor" + str(i)) for i in range(4)]
         relative_poses_test = dc.get_relative_body_poses(rb, rotors)
         print(relative_poses_test)
@@ -75,6 +94,9 @@ class NonlinearController():
               
         # Auxiliar variable, so that we only start sending motor commands once we get the state of the vehicle
         self.received_first_state = False
+
+        self.RL_algorithm = ActionBroadcaster()
+        self.velocity = 2
 
    
     def update_state(self, state: torch.Tensor):
@@ -118,11 +140,25 @@ class NonlinearController():
         # -------------------------------------------------
         # Update the references for the controller to track
         # -------------------------------------------------
-        p_ref = np.array([0,0,1])
-        v_ref = np.array([0,0,0])
+        # p_ref = np.array([0,0,1])
+        # v_ref = np.array([0,0,0])
+        # a_ref = np.array([0,0,0])
+        # j_ref = np.array([0,0,0])
+        # yaw_ref = 0
+        # yaw_rate_ref = 0
+
+        action =  self.RL_algorithm.get_action()
+        v_ref = np.zeros(3)
+        v_ref[0:2] = action * self.velocity
+        p_ref = self.p[0,:] + v_ref*dt
+        print(v_ref)
+        print(self.p)
+        print(p_ref)
+        p_ref[2] = 1
+        # v_ref = np.array([0,0,0])
         a_ref = np.array([0,0,0])
         j_ref = np.array([0,0,0])
-        yaw_ref = 0
+        yaw_ref = 0                 # Make drone face the direction it is going!!
         yaw_rate_ref = 0
   
         # -------------------------------------------------

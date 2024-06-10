@@ -141,7 +141,7 @@ def main():
     while simulation_app.is_running():
         with torch.inference_mode():
             # reset
-            if count % 500 == 0:
+            if count % 1000 == 0:
                 count = 0
                 env.reset()
                 print("-" * 80)
