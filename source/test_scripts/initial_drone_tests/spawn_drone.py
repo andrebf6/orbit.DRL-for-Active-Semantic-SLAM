@@ -29,7 +29,8 @@ def design_scene():
     cfg_light_distant.func("/World/lightDistant", cfg_light_distant, translation=(1, 0, 10))
     
     # spawn a usd file of a drone into the scene
-    cfg = sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Robots/Crazyflie/cf2x.usd")
+    # cfg = sim_utils.UsdFileCfg(usd_path=f"{ISAAC_NUCLEUS_DIR}/Robots/Crazyflie/cf2x.usd")
+    cfg = sim_utils.UsdFileCfg(usd_path=f"/orbit.DRL-for-Active-Semantic-SLAM/source/drone_models/iris.usd")
     cfg.func("/World/Robot", cfg, translation=(0.0, 0.0, 1.05))
 
 

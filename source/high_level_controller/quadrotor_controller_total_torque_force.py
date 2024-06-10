@@ -9,14 +9,6 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 import torch
 
-# Instantiation example:
-# [NonlinearController(
-#             env_num = self.num_envs,
-#             trajectory_file=self.curr_dir + "/trajectories/pitch_relay_90_deg_2.csv",
-#             results_file=self.curr_dir + "/results/single_statistics.npz",
-#             Ki=[0.5, 0.5, 0.5],
-#             Kr=[2.0, 2.0, 2.0]
-#         )]
 
 class NonlinearController():
     """A nonlinear controller class. It implements a nonlinear controller that allows a drone to track
@@ -25,14 +17,11 @@ class NonlinearController():
 
     def __init__(self,  
         num_envs: int = 1,
-        # setpoint: np.zeros((4,)),         # Action passed by the RL algorithm
-        trajectory_file: str = None,        # Remove afterwards
-        results_file: str = None,           # Remove afterwards (or create a switch to analyse mode)
-        Kp=[10.0, 10.0, 10.0],
-        Kd=[8.5, 8.5, 8.5],
-        Ki=[1.50, 1.50, 1.50],
-        Kr=[3.5, 3.5, 3.5],
-        Kw=[0.5, 0.5, 0.5]):
+        Kp=None,
+        Kd=None,
+        Ki=None,
+        Kr=None,
+        Kw=None):
 
         # Number of spawned environments
         self.num_envs = num_envs 
@@ -58,45 +47,13 @@ class NonlinearController():
         self.int = np.array([0.0, 0.0, 0.0])   
    
         # Define the dynamic parameters for the vehicle
-        self.m = 0.0282             # Mass in Kg
+        self.m = 1.50 #0.025+8e-4*4                  # Mass in Kg
         self.g = 9.81               # The gravity acceleration ms^-2
-        self.max_force = 0.7
-        self.max_torque = 0.7
-              
-        # Read the target trajectory from a CSV file inside the trajectories directory
-        # Remove afterwards
-        self.trajectory = self.read_trajectory_from_csv(trajectory_file)
-        self.index = 0
-        self.max_index, _ = self.trajectory.shape
-        self.total_time = 0.0
+        self.max_force = 100
+        self.max_torque = 100 #0.05
 
         # Auxiliar variable, so that we only start sending motor commands once we get the state of the vehicle
         self.received_first_state = False
-
-        # Lists used for analysing performance statistics
-        # Remove afterwards (or create a switch to analyse mode)
-        self.results_files = results_file
-        self.time_vector = []
-        self.desired_position_over_time = []
-        self.position_over_time = []
-        self.position_error_over_time = []
-        self.velocity_error_over_time = []
-        self.atittude_error_over_time = []
-        self.attitude_rate_error_over_time = []
-
-    def read_trajectory_from_csv(self, file_name: str):
-        """Auxiliar method used to read the desired trajectory from a CSV file
-
-        Args:
-            file_name (str): A string with the name of the trajectory inside the trajectories directory
-
-        Returns:
-            np.ndarray: A numpy matrix with the trajectory desired states over time
-        """
-        # Remove afterwards
-        # Read the trajectory to a pandas frame
-        return np.flip(np.genfromtxt(file_name, delimiter=','), axis=0)
-
 
     def update_state(self, state: torch.Tensor):
         """
@@ -114,14 +71,16 @@ class NonlinearController():
             orientation_quat[i,:] = state[i,3:7].cpu().numpy()
             self.v[i,:] = state[i, 7:10].cpu().numpy()
             self.w[i,:] = state[i, 10:13].cpu().numpy()
-            # print("Robot position: ", self.p[i,:], "linear velocity: ", self.v[i,:], "angular velocity: ", self.w[i,:])
+            print("Robot position: ", self.p[i,:], "linear velocity: ", self.v[i,:], "angular velocity: ", self.w[i,:])
         
-        orientation_quat[:, [0, 3]] = orientation_quat[:, [3, 0]]
+        orientation_quat = orientation_quat[:, [1, 2, 3, 0]]
         self.R = Rotation.from_quat(orientation_quat)
             
-        # for i in range(self.num_envs):
-        #     print("Robot rotation: ", self.R[i].as_matrix())
-        
+        for i in range(self.num_envs):
+            print(orientation_quat[i,:])
+            print("Robot rotation: ", self.R[i].as_matrix())
+            print("Robot rotation: ", self.R[i].as_euler("xyz"))
+         
         self.received_first_state = True
 
     def input_reference(self):
@@ -145,32 +104,13 @@ class NonlinearController():
         # -------------------------------------------------
         # Update the references for the controller to track
         # -------------------------------------------------
-        self.total_time += dt
-        
-        # Check if we need to update to the next trajectory index
-        # Remove afterwards
-        if self.index < self.max_index - 1 and self.total_time >= self.trajectory[self.index + 1, 0]:
-            self.index += 1
-
-        # Update using an external trajectory
-        # Remove afterwards
-        # # the target positions [m], velocity [m/s], accelerations [m/s^2], jerk [m/s^3], yaw-angle [rad], yaw-rate [rad/s]
-        # p_ref = np.array([self.trajectory[self.index, 1], self.trajectory[self.index, 2], self.trajectory[self.index, 3]])
-        # v_ref = np.array([self.trajectory[self.index, 4], self.trajectory[self.index, 5], self.trajectory[self.index, 6]])
-        # a_ref = np.array([self.trajectory[self.index, 7], self.trajectory[self.index, 8], self.trajectory[self.index, 9]])
-        # j_ref = np.array([self.trajectory[self.index, 10], self.trajectory[self.index, 11], self.trajectory[self.index, 12]])
-        # yaw_ref = self.trajectory[self.index, 13]
-        # yaw_rate_ref = self.trajectory[self.index, 14]
-
         p_ref = np.array([0,0,1])
         v_ref = np.array([0,0,0])
         a_ref = np.array([0,0,0])
         j_ref = np.array([0,0,0])
         yaw_ref = 0
         yaw_rate_ref = 0
-
-        # print("References updated as: position ", p_ref, "Linear velocity",v_ref , "Jerk", j_ref , "Acceleration", a_ref ,"Yaw", yaw_ref, "Yaw_ref", yaw_rate_ref)
-            
+    
         # -------------------------------------------------
         # Start the controller implementation
         # -------------------------------------------------
@@ -188,15 +128,13 @@ class NonlinearController():
 
             # print("Robot velocity in world frame:", self.v[i,:])
             # print("Desired velocity in world frame:", v_ref)
-
-            print("Position error:", ep)
-            print("Velocity error:", ev)
-            print("Weight term:", np.array([0.0, 0.0, self.m * self.g]))
-            print("Acceleration term:", self.m * a_ref)
-
+            
             # Compute F_des term
             F_des = -(self.Kp @ ep) - (self.Kd @ ev) - (self.Ki @ ei) + np.array([0.0, 0.0, self.m * self.g]) + (self.m * a_ref)
-
+            print("prop f", (self.Kp @ ep))
+            print("der f", (self.Kd @ ev))
+            print("Weight term:", np.array([0.0, 0.0, self.m * self.g]))
+            print("Acceleration term:", self.m * a_ref)
             print('Desired force: ', F_des)
 
             # Get the current axis Z_B (given by the last column of the rotation matrix)
@@ -241,7 +179,7 @@ class NonlinearController():
                             np.dot(hw, X_b_des), 
                             yaw_rate_ref * Z_b_des[2]])
             
-            print("Desired angular velocity:", self.a)
+            print("Desired angular velocity:", w_des)
 
             # Compute the angular velocity error
             e_w = self.w[i,:] - w_des
@@ -252,7 +190,8 @@ class NonlinearController():
 
             # Compute the torques to apply on the rigid body
             tau = -(self.Kr @ e_R) - (self.Kw @ e_w)
-
+            print("Kr tau", (self.Kr @ e_R))
+            print("Kw tau", (self.Kw @ e_w))
             # Convert the desired force and torque to angular velocity [rad/s] references to give to each rotor.
             self.applied_wrench[i,2] = self.clip(u_1, self.max_force)
             self.applied_wrench[i,3:6] = self.clip(tau, self.max_torque)
@@ -260,13 +199,13 @@ class NonlinearController():
         # ----------------------------
         # Statistics to save for later
         # ----------------------------
-        self.time_vector.append(self.total_time)
-        self.position_over_time.append(self.p)
-        self.desired_position_over_time.append(p_ref)
-        self.position_error_over_time.append(ep)
-        self.velocity_error_over_time.append(ev)
-        self.atittude_error_over_time.append(e_R)
-        self.attitude_rate_error_over_time.append(e_w)
+        # self.time_vector.append(self.total_time)
+        # self.position_over_time.append(self.p)
+        # self.desired_position_over_time.append(p_ref)
+        # self.position_error_over_time.append(ep)
+        # self.velocity_error_over_time.append(ev)
+        # self.atittude_error_over_time.append(e_R)
+        # self.attitude_rate_error_over_time.append(e_w)
 
         return  self.applied_wrench
 

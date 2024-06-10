@@ -3,7 +3,7 @@ from omni.isaac.orbit.app import AppLauncher
 
 # add argparse arguments
 parser = argparse.ArgumentParser(description="Launch a quadrotor base environment.")
-parser.add_argument("--num_envs", type=int, default=2, help="Number of environments to spawn.")
+parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to spawn.")
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 
@@ -128,8 +128,8 @@ def main():
                 print("[INFO]: Resetting environment...")
 
             wrench_target = torch.zeros_like(env.action_manager.action)
-            wrench_target[:, 2] = 9.8*0.028 # Force on the drone Z axis
-            wrench_target[:, 3:6] = torch.tensor([0, 0, 0]) # Torque
+            wrench_target[:, 2] = 0.028 # Force on the drone Z axis
+            wrench_target[:, 3:6] = torch.tensor([0, 0, count*0.0001]) # Torque
 
             print("Applied wrench", wrench_target)
 

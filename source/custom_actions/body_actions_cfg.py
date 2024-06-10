@@ -12,3 +12,12 @@ class BodyWrenchActionCfg(ActionTermCfg):
 
     class_type: type[ActionTerm] = body_actions.BodyWrenchAction
 
+@configclass
+class RotorVelocitiesActionCfg(ActionTermCfg):
+    """Configuration for the body wrench action term.
+
+    See :class:`BodyWrenchAction` for more details.
+    """
+
+    class_type: type[ActionTerm] = body_actions.RotorVelocitiesAction
+

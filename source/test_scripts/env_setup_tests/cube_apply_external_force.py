@@ -45,14 +45,13 @@ class QuadrotorSceneCfg(InteractiveSceneCfg):
     # drone
     robot = RigidObjectCfg(
         prim_path="{ENV_REGEX_NS}/Robot",
-        spawn=sim_utils.CuboidCfg(size=[0.1 ,0.1, 0.001], 
+        spawn=sim_utils.CuboidCfg(size=[0.1 ,0.1, 0.01], 
                                   rigid_props=sim_utils.RigidBodyPropertiesCfg(), 
                                   mass_props=sim_utils.MassPropertiesCfg(mass=1.0), 
                                   collision_props=sim_utils.CollisionPropertiesCfg(), 
                                   visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0))),
     )
-    
-   
+       
     # lights
     dome_light = AssetBaseCfg(
         prim_path="/World/DomeLight",
@@ -134,13 +133,14 @@ def main():
                 print("[INFO]: Resetting environment...")
 
             wrench_target = torch.zeros_like(env.action_manager.action)
-            wrench_target[:, 2] = 9.8*1.01 # Force on the drone Z axis
-            wrench_target[:, 3:6] = torch.tensor([0, 0.01, 0]) # Torque
+            wrench_target[:, 2] = 9.8*1.05 # Force on the drone Z axis
+            wrench_target[:, 3:6] = torch.tensor([0.01, 0, 0]) # Torque
 
             print("Applied wrench", wrench_target)
 
             # step the environment
             obs, _ = env.step(wrench_target)
+            print("------------------------------ Next Step ----------------------------------------------")
 
             # update counter
             count += 1

@@ -21,18 +21,17 @@ from omni.isaac.orbit.envs import BaseEnv, BaseEnvCfg
 # from omni.isaac.orbit.managers import EventTermCfg as EventTerm
 from omni.isaac.orbit.managers import ObservationGroupCfg as ObsGroup
 from omni.isaac.orbit.managers import ObservationTermCfg as ObsTerm
-from source.custom_actions.body_actions_cfg import BodyWrenchActionCfg, RotorVelocitiesActionCfg
+from source.custom_actions.body_actions_cfg import BodyWrenchActionCfg
 # from omni.isaac.orbit.managers import SceneEntityCfg
 from omni.isaac.orbit.utils import configclass
 
 import omni.isaac.orbit.sim as sim_utils
-from omni.isaac.orbit.assets import ArticulationCfg, AssetBaseCfg
+from omni.isaac.orbit.assets import RigidObjectCfg, AssetBaseCfg
 from omni.isaac.orbit.scene import InteractiveSceneCfg
 
 # Depends on UAV
-# from source.drone_models.crazyflie import get_crazyflie_config 
-from source.drone_models.iris import get_iris_config 
-from source.high_level_controller.quadrotor_controller import NonlinearController
+from source.drone_models.crazyflie import get_crazyflie_config 
+from source.high_level_controller.quadrotor_controller_total_torque_force import NonlinearController
 
 @configclass
 class QuadrotorSceneCfg(InteractiveSceneCfg):
@@ -44,10 +43,15 @@ class QuadrotorSceneCfg(InteractiveSceneCfg):
         spawn=sim_utils.GroundPlaneCfg(size=(100.0, 100.0)),
     )
 
-    # drone
-    # robot: ArticulationCfg =  get_crazyflie_config().replace(prim_path="{ENV_REGEX_NS}/Robot")
-    robot: ArticulationCfg =  get_iris_config().replace(prim_path="{ENV_REGEX_NS}/Robot")
-   
+   # drone
+    robot = RigidObjectCfg(
+        prim_path="{ENV_REGEX_NS}/Robot",
+        spawn=sim_utils.CuboidCfg(size=[0.1 ,0.1, 0.005], 
+                                  rigid_props=sim_utils.RigidBodyPropertiesCfg(), 
+                                  mass_props=sim_utils.MassPropertiesCfg(mass=1.0), 
+                                  collision_props=sim_utils.CollisionPropertiesCfg(), 
+                                  visual_material=sim_utils.PreviewSurfaceCfg(diffuse_color=(0.0, 1.0, 0.0))),
+    )
     # lights
     dome_light = AssetBaseCfg(
         prim_path="/World/DomeLight",
@@ -64,7 +68,7 @@ class QuadrotorSceneCfg(InteractiveSceneCfg):
 @configclass
 class ActionsCfg:
     """Action specifications for the environment."""
-    rotor_angular_vels = RotorVelocitiesActionCfg(asset_name="robot")
+    body_wrench = BodyWrenchActionCfg(asset_name="robot")
     
 
 
@@ -95,7 +99,7 @@ class DroneEnvCfg(BaseEnvCfg):
     # Scene settings
     scene = QuadrotorSceneCfg(num_envs=10, env_spacing=2.5)
     # Basic settings
-    observations = ObservationsCfg()
+    # observations = ObservationsCfg()
     actions = ActionsCfg()
 
     def __post_init__(self):
@@ -106,7 +110,7 @@ class DroneEnvCfg(BaseEnvCfg):
         # step settings
         self.decimation = 4  # env step every 4 sim steps: 200Hz / 4 = 50Hz
         # simulation settings
-        self.sim.dt = 0.004  # sim step every 5ms: 200Hz
+        self.sim.dt = 0.005  # sim step every 5ms: 200Hz
 
 
 def main():
@@ -122,17 +126,13 @@ def main():
     # Setup Hig-level controller
     controller = NonlinearController(
             num_envs = env_cfg.scene.num_envs,
-            # Kp=[0.5, 0.5, 1],
-            # Kd=[3.5, 3.5, 3],
-            # Ki=[0.0, 0.0, 0.0],
-            # Kr=[0.005, 0.005, 0.005],
-            # Kw=[0.005, 0.005, 0.005]
-            
-            Kp=[10.0, 10.0, 10.0],
-            Kd=[8.5, 8.5, 8.5],
-            Ki=[0.5, 0.5, 0.5],
-            Kr=[2.0, 2.0, 2.0],
-            Kw=[0.5, 0.5, 0.5]
+            trajectory_file="/orbit.DRL-for-Active-Semantic-SLAM/trajectories/pitch_relay_90_deg_2.csv",
+            results_file="/orbit.DRL-for-Active-Semantic-SLAM/results/single_statistics.npz",
+            Kp=[0.001, 0.001, 0.001],
+            Kd=[0.2, 0.2, 0.2],
+            Ki=[0.0, 0.0, 0.0],
+            Kr=[0.0, 0.0, 0.0],
+            Kw=[0.0, 0.0, 0.0]
         )
     print('Controller set up!')
 
@@ -147,17 +147,17 @@ def main():
                 print("-" * 80)
                 print("[INFO]: Resetting environment...")
 
-            print("---------------------------------- Next step ----------------------------")
             # Access robot state
             robot = env.scene["robot"]
             print("Robot root state: ", robot.data.root_state_w)
 
             # Apply high-level controller
             controller.update_state(state=robot.data.root_state_w)
-            rotor_ang_vel = controller.update(dt=env_cfg.sim.dt)           # DIMENSION = # envs x 4
-            print("All rotor velocities", rotor_ang_vel)
+            wrench = controller.update(dt=env_cfg.sim.dt)           # DIMENSION = # envs x 6
+            print("Wrench to apply: ", wrench)
 
-            obs, _ = env.step(rotor_ang_vel.to(torch.device('cuda:0')))
+            # step the environment
+            obs, _ = env.step(wrench.to(torch.device('cuda:0')))
 
             # update counter
             count += 1

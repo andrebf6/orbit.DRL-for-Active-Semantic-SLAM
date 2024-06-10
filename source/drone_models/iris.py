@@ -1,17 +1,15 @@
 
-"""Configuration for a simple Crazyfly robot."""
+"""Configuration for a simple Iris robot."""
 
 
 import omni.isaac.orbit.sim as sim_utils
 from omni.isaac.orbit.actuators import ImplicitActuatorCfg
 from omni.isaac.orbit.assets import ArticulationCfg
 
-from omni.isaac.orbit.utils.assets import ISAAC_NUCLEUS_DIR
-
-def get_crazyflie_config():
-    CRAZIFLIE_CONFIG = ArticulationCfg(
+def get_iris_config():
+    IRIS_CONFIG = ArticulationCfg(
         spawn=sim_utils.UsdFileCfg(
-            usd_path=f"{ISAAC_NUCLEUS_DIR}//Robots/Crazyflie/cf2x.usd",
+            usd_path=f"/orbit.DRL-for-Active-Semantic-SLAM/source/drone_models/iris.usd",
             rigid_props=sim_utils.RigidBodyPropertiesCfg(
                 rigid_body_enabled=True,
                 max_linear_velocity=1000.0,
@@ -31,32 +29,32 @@ def get_crazyflie_config():
             ),
         ),
         init_state=ArticulationCfg.InitialStateCfg(
-            pos=(0.0, 0.0, 0.0), joint_pos={"m1_joint": 0.0, "m2_joint": 0.0, "m3_joint": 0.0, "m4_joint": 0.0}
+            pos=(0.0, 0.0, 0.0), joint_pos={"joint0": 0.0, "joint1": 0.0, "joint2": 0.0, "joint3": 0.0}
         ),
         actuators={
             "body_prop_1": ImplicitActuatorCfg(
-                joint_names_expr=["m1_joint"],
+                joint_names_expr=["joint0"],
                 effort_limit=2000.0,
                 velocity_limit=1000.0,
                 stiffness=0.0,
                 damping=100.0,
             ),
             "body_prop_2": ImplicitActuatorCfg(
-                joint_names_expr=["m2_joint"],
+                joint_names_expr=["joint1"],
                 effort_limit=2000.0,
                 velocity_limit=1000.0,
                 stiffness=0.0,
                 damping=100.0,
             ),
             "body_prop_3": ImplicitActuatorCfg(
-                joint_names_expr=["m3_joint"],
+                joint_names_expr=["joint2"],
                 effort_limit=2000.0,
                 velocity_limit=1000.0,
                 stiffness=0.0,
                 damping=100.0,
             ),
             "body_prop_4": ImplicitActuatorCfg(
-                joint_names_expr=["m4_joint"],
+                joint_names_expr=["joint3"],
                 effort_limit=2000.0,
                 velocity_limit=1000.0,
                 stiffness=0.0,
@@ -64,4 +62,4 @@ def get_crazyflie_config():
             ),
         },
     )
-    return CRAZIFLIE_CONFIG
+    return IRIS_CONFIG

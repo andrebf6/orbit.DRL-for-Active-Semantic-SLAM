@@ -9,14 +9,8 @@ import numpy as np
 from scipy.spatial.transform import Rotation
 import torch
 
-# Instantiation example:
-# [NonlinearController(
-#             env_num = self.num_envs,
-#             trajectory_file=self.curr_dir + "/trajectories/pitch_relay_90_deg_2.csv",
-#             results_file=self.curr_dir + "/results/single_statistics.npz",
-#             Ki=[0.5, 0.5, 0.5],
-#             Kr=[2.0, 2.0, 2.0]
-#         )]
+from omni.isaac.dynamic_control import _dynamic_control
+dc = _dynamic_control.acquire_dynamic_control_interface()
 
 class NonlinearController():
     """A nonlinear controller class. It implements a nonlinear controller that allows a drone to track
@@ -25,14 +19,11 @@ class NonlinearController():
 
     def __init__(self,  
         num_envs: int = 1,
-        # setpoint: np.zeros((4,)),         # Action passed by the RL algorithm
-        trajectory_file: str = None,        # Remove afterwards
-        results_file: str = None,           # Remove afterwards (or create a switch to analyse mode)
-        Kp=[10.0, 10.0, 10.0],
-        Kd=[8.5, 8.5, 8.5],
-        Ki=[1.50, 1.50, 1.50],
-        Kr=[3.5, 3.5, 3.5],
-        Kw=[0.5, 0.5, 0.5]):
+        Kp=None,
+        Kd=None,
+        Ki=None,
+        Kr=None,
+        Kw=None):
 
         # Number of spawned environments
         self.num_envs = num_envs 
@@ -58,69 +49,40 @@ class NonlinearController():
         self.int = np.array([0.0, 0.0, 0.0])   
    
         # Define the dynamic parameters for the vehicle
-        self.m = 0.0282             # Mass in Kg
+        self.m = 1.50               # Mass in Kg
         self.g = 9.81               # The gravity acceleration ms^-2
-
+        self.max_rotor_vel = 1100
+        
         # Define the alocation matrix
-        self.cf = 5.84e-6           # Thurst coefficient
-        self.ct = 1e-6              # Drag coefficient
-        self.L = 0.043841           # Arm length
+        cf = 8.54858e-6        # Thurst coefficient
+        ct = 1e-6              # Drag coefficient
+        rot_dir = np.array([-1, -1, 1, 1])
+        relative_poses = np.array([[0.13759538531303406, -0.20673562586307526, 0.023], [-0.125,  0.21869462728500366, 0.0230001], [0.13830871880054474, 0.20321962237358093, 0.023], [-0.12450209259986877, -0.22199904918670654, 0.023]])
+        
+        rb =dc.get_rigid_body("env0/Robot" + "/body")
+        rotors = [dc.get_rigid_body("env0/Robot" + "/rotor" + str(i)) for i in range(4)]
+        relative_poses_test = dc.get_relative_body_poses(rb, rotors)
+        print(relative_poses_test)
         
         aloc_matrix = np.zeros((4, 4))
-        aloc_matrix[0, :] = np.array(self.cf)
-        row_2 = np.array([0, self.cf*self.L, 0, -self.cf*self.L])                                           
-        aloc_matrix[1, :] = row_2 
-        row_3 = np.array([-self.cf*self.L, 0, self.cf*self.L, 0])
-        aloc_matrix[2, :] = row_3
-        row_4 = np.array([self.ct, -self.ct, self.ct, -self.ct])
-        aloc_matrix[3, :] =  row_4
+        aloc_matrix[0, :] = np.array(cf)
+        aloc_matrix[1, :] = np.array([relative_poses[i,1] * cf for i in range(4)])
+        aloc_matrix[2, :] = np.array([-relative_poses[i,0] * cf for i in range(4)])
+        aloc_matrix[3, :] = np.array([ct * rot_dir[i] for i in range(4)])
 
         self.aloc_inv = np.linalg.pinv(aloc_matrix)
-        # print("allocation matrix inverted : ", self.aloc_inv)
-
-        self.max_rotor_vel = 2000
+        print("allocation matrix: ", aloc_matrix)
               
-        # Read the target trajectory from a CSV file inside the trajectories directory
-        # Remove afterwards
-        self.trajectory = self.read_trajectory_from_csv(trajectory_file)
-        self.index = 0
-        self.max_index, _ = self.trajectory.shape
-        self.total_time = 0.0
-
         # Auxiliar variable, so that we only start sending motor commands once we get the state of the vehicle
         self.received_first_state = False
 
-        # Lists used for analysing performance statistics
-        # Remove afterwards (or create a switch to analyse mode)
-        self.results_files = results_file
-        self.time_vector = []
-        self.desired_position_over_time = []
-        self.position_over_time = []
-        self.position_error_over_time = []
-        self.velocity_error_over_time = []
-        self.atittude_error_over_time = []
-        self.attitude_rate_error_over_time = []
-
-    def read_trajectory_from_csv(self, file_name: str):
-        """Auxiliar method used to read the desired trajectory from a CSV file
-
-        Args:
-            file_name (str): A string with the name of the trajectory inside the trajectories directory
-
-        Returns:
-            np.ndarray: A numpy matrix with the trajectory desired states over time
-        """
-        # Remove afterwards
-        # Read the trajectory to a pandas frame
-        return np.flip(np.genfromtxt(file_name, delimiter=','), axis=0)
-
-
+   
     def update_state(self, state: torch.Tensor):
         """
         Method that updates the current state of the drones.
 
         Args:
-            state (torch.Tensor): [pos, quat, lin_vel, ang_vel]`` in the simulation world frame. Shape is (env_num, 13).
+            state (torch.Tensor): [pos, quat, lin_vel, ang_vel]) in the simulation world frame. Shape is (env_num, 13).
         """
         if self.num_envs != state.size(0):
             raise ValueError(f"Unexpected state row number: rows in state {state.size(0)}, env_num: {self.num_envs}.")
@@ -131,24 +93,16 @@ class NonlinearController():
             orientation_quat[i,:] = state[i,3:7].cpu().numpy()
             self.v[i,:] = state[i, 7:10].cpu().numpy()
             self.w[i,:] = state[i, 10:13].cpu().numpy()
-            # print("Robot position: ", self.p[i,:], "linear velocity: ", self.v[i,:], "angular velocity: ", self.w[i,:])
+            print("Robot position: ", self.p[i,:], "linear velocity: ", self.v[i,:], "angular velocity: ", self.w[i,:])
         
-        orientation_quat[:, [0, 3]] = orientation_quat[:, [3, 0]]
+        orientation_quat = orientation_quat[:, [1, 2, 3, 0]]
         self.R = Rotation.from_quat(orientation_quat)
             
-        # for i in range(self.num_envs):
-        #     print("Robot rotation: ", self.R[i].as_matrix())
+        for i in range(self.num_envs):
+            print("Robot rotation: ", self.R[i].as_matrix())
         
         self.received_first_state = True
 
-    def input_reference(self):
-        """
-        Method that is used to return the latest target angular velocities to be applied to the vehicle
-
-        Returns:
-            A list with the target angular velocities for each individual rotor of the vehicle
-        """
-        return self.input_ref
 
     def update(self, dt: float):
         """Method that implements the nonlinear control law and updates the target angular velocities for each rotor. 
@@ -164,25 +118,13 @@ class NonlinearController():
         # -------------------------------------------------
         # Update the references for the controller to track
         # -------------------------------------------------
-        self.total_time += dt
-        
-        # Check if we need to update to the next trajectory index
-        # Remove afterwards
-        if self.index < self.max_index - 1 and self.total_time >= self.trajectory[self.index + 1, 0]:
-            self.index += 1
-
-        # Update using an external trajectory
-        # Remove afterwards
-        # the target positions [m], velocity [m/s], accelerations [m/s^2], jerk [m/s^3], yaw-angle [rad], yaw-rate [rad/s]
-        p_ref = np.array([self.trajectory[self.index, 1], self.trajectory[self.index, 2], self.trajectory[self.index, 3]])
-        v_ref = np.array([self.trajectory[self.index, 4], self.trajectory[self.index, 5], self.trajectory[self.index, 6]])
-        a_ref = np.array([self.trajectory[self.index, 7], self.trajectory[self.index, 8], self.trajectory[self.index, 9]])
-        j_ref = np.array([self.trajectory[self.index, 10], self.trajectory[self.index, 11], self.trajectory[self.index, 12]])
-        yaw_ref = self.trajectory[self.index, 13]
-        yaw_rate_ref = self.trajectory[self.index, 14]
-
-        # print("References updated as: position ", p_ref, "Linear velocity",v_ref , "Jerk", j_ref , "Acceleration", a_ref ,"Yaw", yaw_ref, "Yaw_ref", yaw_rate_ref)
-            
+        p_ref = np.array([0,0,1])
+        v_ref = np.array([0,0,0])
+        a_ref = np.array([0,0,0])
+        j_ref = np.array([0,0,0])
+        yaw_ref = 0
+        yaw_rate_ref = 0
+  
         # -------------------------------------------------
         # Start the controller implementation
         # -------------------------------------------------
@@ -195,23 +137,22 @@ class NonlinearController():
             self.int = self.int +  (ep * dt)
             ei = self.int
 
-            print("Robot position in world frame:", self.p[i,:])
-            print("Desired position in world frame:", p_ref)
-
-            # print("Postion error:", ep)
-            # print("Velocity error:", ev)
-            # print("Integral error:", ei)
-
             # Compute F_des term
             F_des = -(self.Kp @ ep) - (self.Kd @ ev) - (self.Ki @ ei) + np.array([0.0, 0.0, self.m * self.g]) + (self.m * a_ref)
 
+            print("prop f: ", self.Kp @ ep)
+            print("der f: ", self.Kd @ ev)
+            print("int f: ", self.Ki @ ei)
+            print("Weight term: ", np.array([0.0, 0.0, self.m * self.g]))
+            print("Acceleration term: ", self.m * a_ref)
+            print("Desired force: ", F_des)
 
             # Get the current axis Z_B (given by the last column of the rotation matrix)
             Z_B = self.R[i].as_matrix()[:,2]
             
             # Get the desired total thrust in Z_B direction (u_1)
             u_1 = F_des @ Z_B
-            print("Force on zb axis", u_1 )
+            print("Force on zb axis: ", u_1 )
 
             # Compute the desired body-frame axis Z_b
             Z_b_des = F_des / np.linalg.norm(F_des)
@@ -245,29 +186,20 @@ class NonlinearController():
             w_des = np.array([-np.dot(hw, Y_b_des), 
                             np.dot(hw, X_b_des), 
                             yaw_rate_ref * Z_b_des[2]])
+            print("Desired angular velocity: ", w_des)
 
             # Compute the angular velocity error
             e_w = self.w[i,:] - w_des
 
             # Compute the torques to apply on the rigid body
             tau = -(self.Kr @ e_R) - (self.Kw @ e_w)
-            print("Torque", tau )
+            print("Kr tau: ", self.Kr @ e_R)
+            print("Kw tau: ", self.Kw @ e_w)
+            print("Torque: ", tau )
 
             # Convert the desired force and torque to angular velocity [rad/s] references to give to each rotor.
             self.input_ref[i,:] = self.force_and_torques_to_velocities(u_1, tau, self.aloc_inv, self.max_rotor_vel)
                    
-
-        # ----------------------------
-        # Statistics to save for later
-        # ----------------------------
-        self.time_vector.append(self.total_time)
-        self.position_over_time.append(self.p)
-        self.desired_position_over_time.append(p_ref)
-        self.position_error_over_time.append(ep)
-        self.velocity_error_over_time.append(ev)
-        self.atittude_error_over_time.append(e_R)
-        self.attitude_rate_error_over_time.append(e_w)
-
         return self.input_ref
 
     @staticmethod
@@ -298,9 +230,8 @@ class NonlinearController():
 
         # Compute the target angular velocities (squared)
         squared_ang_vel = aloc_inv @ np.array([force, torque[0], torque[1], torque[2]])
-
-        print("rotor velocities : ", np.sqrt(squared_ang_vel))
-
+        print("squared rotor velocities : ", squared_ang_vel)
+        
         # Making sure that there is no negative value on the target squared angular velocities
         squared_ang_vel[squared_ang_vel < 0] = 0.0
 
@@ -317,5 +248,6 @@ class NonlinearController():
 
         # Compute the angular velocities for each rotor in [rad/s]
         ang_vel = np.sqrt(squared_ang_vel)
+        print("rotor velocities : ", ang_vel)
 
         return torch.tensor(ang_vel)
